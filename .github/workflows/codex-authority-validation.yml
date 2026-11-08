@@ -8,13 +8,24 @@ permissions:
   contents: read
 
 jobs:
-  windows-regression:
-    runs-on: windows-latest
+  linux-regression:
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 3
+          fetch-depth: 4
+      - name: Install Linux build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libnm-dev patchelf
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           $source = 'src-tauri/src/modules/codex_account_authority_sync.rs'
-          git show "HEAD~2:$source" | Set-Content -LiteralPath $source -Encoding utf8NoBOM
+          git show "02498ace91832248f0c6d43f6ea3894a2514aed7:$source" | Set-Content -LiteralPath $source -Encoding utf8NoBOM
           $output = & cargo test --package cockpit-tools --lib live_authority_sync_reads_default_auth_with_electron_process_entries --locked --jobs 2 -- --test-threads=1 2>&1
           $result = $LASTEXITCODE
           $output | Write-Output
