@@ -1,0 +1,42 @@
+name: Codex live authority regression validation
+
+on:
+  push:
+    branches: [verify/codex-live-authority-default-home]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-regression:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build frontend inputs required by Tauri
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Test live authority sync and existing runtime selection
+        run: |
+          cargo test --package cockpit-tools --lib live_authority_sync_ --locked --jobs 2 -- --test-threads=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --package cockpit-tools --lib runtime_authority_sync_ --locked --jobs 2 -- --test-threads=1
+          exit $LASTEXITCODE
+      - name: Verify the positive regression fails without the fix
+        shell: pwsh
+        run: |
+          $source = 'src-tauri/src/modules/codex_account_authority_sync.rs'
+          git show "HEAD~2:$source" | Set-Content -LiteralPath $source -Encoding utf8NoBOM
+          $output = & cargo test --package cockpit-tools --lib live_authority_sync_reads_default_auth_with_electron_process_entries --locked --jobs 2 -- --test-threads=1 2>&1
+          $result = $LASTEXITCODE
+          $output | Write-Output
+          if ($result -eq 0 -or ($output -join "`n") -notmatch 'test result: FAILED\. 0 passed; 1 failed') {
+            throw 'Expected the regression assertion to fail on the original implementation'
+          }
