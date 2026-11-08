@@ -51,3 +51,6 @@ jobs:
           if ($result -eq 0 -or ($output -join "`n") -notmatch 'test result: FAILED\. 0 passed; 1 failed') {
             throw 'Expected the regression assertion to fail on the original implementation'
           }
+          # The failing cargo command is intentional; do not let the pwsh
+          # runner propagate its exit code after validating the assertion.
+          exit 0
